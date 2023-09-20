@@ -11,64 +11,67 @@
 //  - HatTip (https://github.com/hattipjs/hattip)
 //    - You can use Bati (https://batijs.github.io/) to scaffold a vite-plugin-ssr + HatTip app. Note that Bati generates apps that use the V1 design (https://vite-plugin-ssr.com/migration/v1-design) and Vike packages (https://vite-plugin-ssr.com/vike-packages)
 
-import express from 'express'
-import compression from 'compression'
-import { renderPage } from 'vite-plugin-ssr/server'
-import { root } from './root.js'
-const isProduction = process.env.NODE_ENV === 'production'
+import express from "express";
+import compression from "compression";
+import { configDotenv } from "dotenv";
+import { renderPage } from "vite-plugin-ssr/server";
+import { root } from "./root.js";
+const isProduction = process.env.NODE_ENV === "production";
 
-startServer()
+configDotenv();
+
+await startServer();
 
 async function startServer() {
-  const app = express()
+    const app = express();
 
-  app.use(compression())
+    app.use(compression());
 
-  // Vite integration
-  if (isProduction) {
-    // In production, we need to serve our static assets ourselves.
-    // (In dev, Vite's middleware serves our static assets.)
-    const sirv = (await import('sirv')).default
-    app.use(sirv(`${root}/dist/client`))
-  } else {
-    // We instantiate Vite's development server and integrate its middleware to our server.
-    // ⚠️ We instantiate it only in development. (It isn't needed in production and it
-    // would unnecessarily bloat our production server.)
-    const vite = await import('vite')
-    const viteDevMiddleware = (
-      await vite.createServer({
-        root,
-        server: { middlewareMode: true }
-      })
-    ).middlewares
-    app.use(viteDevMiddleware)
-  }
-
-  // ...
-  // Other middlewares (e.g. some RPC middleware such as Telefunc)
-  // ...
-
-  // Vite-plugin-ssr middleware. It should always be our last middleware (because it's a
-  // catch-all middleware superseding any middleware placed after it).
-  app.get('*', async (req, res, next) => {
-    const pageContextInit = {
-      urlOriginal: req.originalUrl
-    }
-    const pageContext = await renderPage(pageContextInit)
-    const { httpResponse } = pageContext
-    if (!httpResponse) {
-      return next()
+    // Vite integration
+    if (isProduction) {
+        // In production, we need to serve our static assets ourselves.
+        // (In dev, Vite's middleware serves our static assets.)
+        const sirv = (await import("sirv")).default;
+        app.use(sirv(`${root}/dist/client`));
     } else {
-      const { body, statusCode, headers, earlyHints } = httpResponse
-      if (res.writeEarlyHints) res.writeEarlyHints({ link: earlyHints.map((e) => e.earlyHintLink) })
-      headers.forEach(([name, value]) => res.setHeader(name, value))
-      res.status(statusCode)
-      // For HTTP streams use httpResponse.pipe() instead, see https://vite-plugin-ssr.com/stream
-      res.send(body)
+        // We instantiate Vite's development server and integrate its middleware to our server.
+        // ⚠️ We instantiate it only in development. (It isn't needed in production and it
+        // would unnecessarily bloat our production server.)
+        const vite = await import("vite");
+        const viteDevelopmentMiddleware = (
+            await vite.createServer({
+                root,
+                server: { middlewareMode: true },
+            })
+        ).middlewares;
+        app.use(viteDevelopmentMiddleware);
     }
-  })
 
-  const port = process.env.PORT || 3000
-  app.listen(port)
-  console.log(`Server running at http://localhost:${port}`)
+    // ...
+    // Other middlewares (e.g. some RPC middleware such as Telefunc)
+    // ...
+
+    // Vite-plugin-ssr middleware. It should always be our last middleware (because it's a
+    // catch-all middleware superseding any middleware placed after it).
+    app.get("*", async (req, res, next) => {
+        const pageContextInit = {
+            urlOriginal: req.originalUrl,
+        };
+        const pageContext = await renderPage(pageContextInit);
+        const { httpResponse } = pageContext;
+        if (httpResponse) {
+            const { body, statusCode, headers, earlyHints } = httpResponse;
+            if (res.writeEarlyHints) res.writeEarlyHints({ link: earlyHints.map((e) => e.earlyHintLink) });
+            for (const [name, value] of headers) res.setHeader(name, value);
+            res.status(statusCode);
+            // For HTTP streams use httpResponse.pipe() instead, see https://vite-plugin-ssr.com/stream
+            res.send(body);
+        } else {
+            return next();
+        }
+    });
+
+    const port = process.env.PORT || 3000;
+    app.listen(port);
+    console.log(`Server running at http://localhost:${port}`);
 }
