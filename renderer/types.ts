@@ -28,6 +28,7 @@ export type PageContextCustom = {
             description?: string;
         };
     };
+    redirectTo: string;
 };
 
 type PageContextServer = PageContextBuiltInServer<Page> & PageContextCustom;
