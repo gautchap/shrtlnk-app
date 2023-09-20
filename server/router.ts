@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createUrl, findUrl } from "./models/url.service.js";
 import { customAlphabet } from "nanoid";
 import { IURL } from "../types/urls.js";
+import { ParsedQs } from "qs";
 
 export const router = Router();
 
